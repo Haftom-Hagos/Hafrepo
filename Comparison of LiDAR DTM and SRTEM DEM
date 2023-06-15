@@ -1,0 +1,153 @@
+#Importing important libraries
+import os
+import requests
+from io import BytesIO
+from zipfile import ZipFile
+from osgeo import gdal
+import rasterio
+from rasterio.plot import show
+from shapely.geometry import Polygon, Point, mapping
+import random
+import fiona
+import geopandas as gpd
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from sklearn.metrics import mean_squared_error as mse
+from scipy.ndimage import gaussian_filter
+import matplotlib.cm as cm
+import matplotlib.lines as mlines
+
+#setup working directory
+working_directory = os.chdir(r'C:\Users\s2509571\Documents\python_project')
+
+#Getting the url of the needed data and read the zip file
+url_dtm = 'https://ns_hwh.fundaments.nl/hwh-ahn/AHN3/DTM_5m/M5_45FZ1.zip'
+url_dem = "https://dds.cr.usgs.gov/download-staging/eyJpZCI6MTYyNjUzNzU5LCJjb250YWN0SWQiOjI0NTQ2MjMyfQ=="
+dtm_request = requests.get(url_dtm)
+dem_request = requests.get(url_dem)
+
+dtm_zip = ZipFile(BytesIO(dtm_request.content))
+dem_zip = ZipFile(BytesIO(dem_request.content))
+
+#Extract the files and save it to working directory
+dtm_file_list = dtm_zip.namelist()
+dtm_file = dtm_file_list[0]
+dem_file_list = dem_zip.namelist()
+dem_file = dem_file_list[0]
+dtm_unzip = ZipFile.extractall(dtm_zip)
+dem_unzip = ZipFile.extractall(dem_zip)
+
+#Resampling and reprojecting both images to similar resolution and CRS
+dtm_output = dtm_file.rsplit( ".", 1 )[ 0 ] +'_resampled.TIF'
+dem_output = dem_file.rsplit( ".", 1 )[ 0 ] +'_resampled.bil'
+gdal.Warp(dtm_output,dtm_file,dstSRS='EPSG:32631', xRes = 30, yRes = 30)
+gdal.Warp(dem_output,dem_file,dstSRS='EPSG:32631', xRes = 30, yRes = 30)
+dtm_image = rasterio.open(dtm_output)
+dem_image = rasterio.open(dem_output)
+poly = Polygon([(dtm_image.bounds.left, dtm_image.bounds.top), (dtm_image.bounds.left, dtm_image.bounds.bottom),  (dtm_image.bounds.right, dtm_image.bounds.bottom), (dtm_image.bounds.right, dtm_image.bounds.top)])
+
+#Exporting the polygon as shapefile to directory
+schema = {
+    'geometry': 'Polygon',
+    'properties': {'id': 'int'},
+}
+with fiona.open('Study_area.shp', 'w', 'ESRI Shapefile', schema) as c:
+    c.write({
+        'geometry': mapping(poly),
+        'properties': {'id': 123},
+    })
+
+#Generating random points
+def polygon_random_points(poly, num_points):
+    min_x, min_y, max_x, max_y = poly.bounds
+    points = []
+    while len(points) < num_points:
+        random_point = Point({random.uniform(min_x, max_x),
+        random.uniform(min_y, max_y)})
+        if (random_point.within(poly)):
+         points.append(random_point)
+    return points
+points = polygon_random_points(poly,5000)
+
+#Converting the random points to a georeferenced shapefile
+raw_points = gpd.GeoSeries(points)
+georef_points = raw_points.set_crs("epsg:32631")
+georef_points.to_file("points.shp")
+points_shapefile = gpd.read_file('points.shp')
+
+#Creating two empty columns alongside the geometry column of the points shapefile
+points_shapefile["DTM"] = 0
+points_shapefile["DEM"] = 0
+
+#Extracting the value of the random points from the DTM and DEM image
+for index, row in points_shapefile.iterrows():
+    longitude = row["geometry"].x
+    latitude = row["geometry"].y
+    dtm_data = dtm_image.read(1)
+    dtm_data = dtm_data.astype(float)
+    dtm_data[dtm_data > 6000] = -999 
+    dem_data = dem_image.read(1)
+    rowIndex, colIndex = dtm_image.index(longitude, latitude)
+    rowIndex1, colIndex1 = dem_image.index(longitude, latitude)
+    points_shapefile["DTM"].loc[index] = dtm_data[rowIndex, colIndex]
+    points_shapefile["DEM"].loc[index] = dem_data[rowIndex1, colIndex1]
+
+#Save the extracted values to csv and read them
+points_shapefile.to_csv("Elevation_values.csv")
+values_csv = pd.read_csv('Elevation_values.csv')
+
+#Filter the values to remove the missing points
+filter = (values_csv['DTM'] > 0)
+filtered = values_csv.loc[filter]
+dtm = filtered['DTM']
+dem = filtered['DEM']
+filtered.to_csv('Filtered_elevation_values.csv')
+
+#plotting the color density scatter plot (heatmap)
+def myplot(x, y, s, bins=1000):
+    heatmap, xedges, yedges = np.histogram2d(x, y, bins=bins)
+    heatmap = gaussian_filter(heatmap, sigma=s)
+    extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    return heatmap.T, extent
+fig, axs = plt.subplots(1,1)
+s = 20
+MSE = mse(dtm,dem, squared=False)
+RMSE = round(MSE, 1)
+correlation_matrix = np.corrcoef(dtm, dem)
+correlation_xy = correlation_matrix[0,1]
+r_squared = correlation_xy**2
+r2 = round(r_squared, 2)
+img, extent = myplot(dtm, dem, s)
+plt.imshow(img, extent=extent, origin = 'lower', cmap=cm.jet)
+axs.set_title("Scatter plot DTM vs DEM  " + "RMSE=%s" % RMSE + "  $R^2$=%s" % r2 )
+axs.set_xlabel('DTM (m)')
+axs.set_ylabel('DEM (m)')
+plt.xlim(7,22)
+plt.ylim(5,25)
+coeff, cons = np.polyfit(dtm, dem, 1)
+Linear = mlines.Line2D(dtm, coeff*dtm+cons, color='red')
+axs.add_line(Linear)
+plt.colorbar()
+#Save the scatter plot to directory 
+fig.savefig("Scatter_plot.png", bbox_inches='tight', dpi=600)
+
+#Exporting summary statistics to directory
+filtered.drop(['geometry', 'FID', 'Unnamed: 0'], axis=1, inplace=True)
+summary = filtered.describe()
+summary.to_csv('Summary.csv')
+
+#Show the scatter plot and statistics summary
+print(summary)
+plt.show()
+
+
+
+
+
+
+
+
+
+
+

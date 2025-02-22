@@ -7,16 +7,16 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "Haftom Hagos // Optional, update with your name
+  "author": "Haftom Hagos",
   "license": "ISC",
-  "description": "Backend for EthioSatHub GEE processing", // Optional, describe your project
+  "description": "Backend for EthioSatHub GEE processing",
   "dependencies": {
     "@google/earthengine": "^1.5.3",
     "cors": "^2.8.5",
     "express": "^4.21.2"
   },
   "engines": {
-    "node": "20.x", // Adjust based on your Node.js version
-    "npm": "10.x"   // Adjust based on your npm version
+    "node": "20.x",
+    "npm": "10.x"
   }
 }

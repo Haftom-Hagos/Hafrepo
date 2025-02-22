@@ -56,18 +56,20 @@ app.post('/getNDVI', (req, res) => {
         const ndvi = sentinel2.normalizedDifference(['B8', 'B4']).rename('NDVI').clip(geometry);
 
         const visParams = {
-            min: -1,
-            max: 1,
+            min: -1,  // Minimum NDVI value
+            max: 1,   // Maximum NDVI value
             palette: ['#d73027', '#f46d43', '#fdae61', '#fee08b', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850']
         };
 
-        ndvi.getDownloadURL({
+        // Explicitly visualize the NDVI for PNG output
+        const visualizedNdvi = ndvi.visualize(visParams);
+
+        visualizedNdvi.getDownloadURL({
             scale: 30,
             region: geometry,
             format: 'PNG',
             crs: 'EPSG:4326',
-            crs_transform: null,
-            visParams: visParams
+            crs_transform: null
         }, (url, error) => {
             if (error) {
                 console.error('NDVI generation error:', error);
@@ -95,17 +97,19 @@ app.post('/getLandCover', (req, res) => {
 
         const visParams = {
             min: 0,
-            max: 11,
+            max: 11, // Adjust based on land cover classes
             palette: ['#006400', '#00ff00', '#ffd700', '#ff0000', '#ff00ff', '#00ffff', '#808080', '#000080', '#800000', '#008000', '#0000ff', '#ff4500']
         };
 
-        landCover.getDownloadURL({
+        // Explicitly visualize the Land Cover for PNG output
+        const visualizedLandCover = landCover.visualize(visParams);
+
+        visualizedLandCover.getDownloadURL({
             scale: 30,
             region: geometry,
             format: 'PNG',
             crs: 'EPSG:4326',
-            crs_transform: null,
-            visParams: visParams
+            crs_transform: null
         }, (url, error) => {
             if (error) {
                 console.error('Land Cover generation error:', error);

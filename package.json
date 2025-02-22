@@ -1,0 +1,22 @@
+{
+  "name": "gee-backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Haftom Hagos // Optional, update with your name
+  "license": "ISC",
+  "description": "Backend for EthioSatHub GEE processing", // Optional, describe your project
+  "dependencies": {
+    "@google/earthengine": "^1.5.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": "20.x", // Adjust based on your Node.js version
+    "npm": "10.x"   // Adjust based on your npm version
+  }
+}

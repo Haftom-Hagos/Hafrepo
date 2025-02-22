@@ -21,29 +21,22 @@ if (!serviceAccountKeyBase64) {
 }
 
 const serviceAccount = JSON.parse(Buffer.from(serviceAccountKeyBase64, 'base64').toString('utf8'));
+ee.data.authenticateViaPrivateKey(serviceAccount, () => {
+    ee.initialize(null, null, () => {
+        console.log('GEE initialized successfully on backend');
+        // Test GEE access to confirm registration
+        ee.data.getAssetRoots((roots, error) => {
+            if (error) {
+                console.error('GEE access test failed:', error);
+            } else {
+                console.log('GEE access test successful, asset roots:', roots);
+            }
+        });
+    }, (error) => {
+        console.error('GEE initialization failed:', error);
+    });
+});
 
-ee.data.authenticateViaPrivateKey(
-    serviceAccount,
-    () => {
-        ee.initialize(null, null,
-            () => {
-                console.log('GEE initialized successfully on backend');
-                // Test GEE access to confirm registration
-                ee.data.getAssetRoots((roots, error) => {
-                    if (error) {
-                        console.error('GEE access test failed:', error);
-                    } else {
-                        console.log('GEE access test successful, asset roots:', roots);
-                    }
-                });
-            }, (error) => {
-                console.error('GEE initialization failed:', error);
-            });
-    },
-    (error) => {
-        console.error('Authentication failed:', error);
-    }
-);
 // Endpoint for NDVI
 app.post('/getNDVI', (req, res) => {
     const { bbox } = req.body;
@@ -67,16 +60,22 @@ app.post('/getNDVI', (req, res) => {
             max: 1,   // Maximum NDVI value
             palette: ['#d73027', '#f46d43', '#fdae61', '#fee08b', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850']
         };
-        ndvi.visualize(visParams).getDownloadURL({
+
+        // Explicitly visualize the NDVI for PNG output
+        const visualizedNdvi = ndvi.visualize(visParams);
+
+        visualizedNdvi.getDownloadURL({
             scale: 30,
             region: geometry,
-            format: 'PNG'
-        }, (url, error) => {
-            if (error) {
-                console.error('NDVI generation error:', error);
-                return res.status(500).json({ error: 'NDVI generation error: ' + error });
+            format: 'PNG',
+            crs: 'EPSG:4326',
+            crs_transform: null
+        }, (urlOrError) => {
+            if (urlOrError instanceof Error) { // Check if it's an error
+                console.error('NDVI generation error:', urlOrError);
+                return res.status(500).json({ error: 'Failed to generate NDVI: ' + urlOrError.message });
             }
-            res.json({ url: url });
+            res.json({ url: urlOrError });
         });
     } catch (error) {
         console.error('Unexpected error in NDVI endpoint:', error);
@@ -101,26 +100,27 @@ app.post('/getLandCover', (req, res) => {
             max: 11, // Adjust based on land cover classes
             palette: ['#006400', '#00ff00', '#ffd700', '#ff0000', '#ff00ff', '#00ffff', '#808080', '#000080', '#800000', '#008000', '#0000ff', '#ff4500']
         };
-        landCover.visualize(visParams).getDownloadURL({
+
+        // Explicitly visualize the Land Cover for PNG output
+        const visualizedLandCover = landCover.visualize(visParams);
+
+        visualizedLandCover.getDownloadURL({
             scale: 30,
             region: geometry,
-            format: 'PNG'
-        }, (url, error) => {
-            if (error) {
-                console.error('Land Cover generation error:', error);
-                return res.status(500).json({ error: 'Land Cover generation error: ' + error });
+            format: 'PNG',
+            crs: 'EPSG:4326',
+            crs_transform: null
+        }, (urlOrError) => {
+            if (urlOrError instanceof Error) { // Check if it's an error
+                console.error('Land Cover generation error:', urlOrError);
+                return res.status(500).json({ error: 'Failed to generate Land Cover: ' + urlOrError.message });
             }
-            res.json({ url: url });
+            res.json({ url: urlOrError });
         });
     } catch (error) {
         console.error('Unexpected error in Land Cover endpoint:', error);
         res.status(500).json({ error: 'Unexpected server error: ' + error.message });
     }
-});
-
-// Define a route handler for the root path
-app.get('/', (req, res) => {
-    res.send('Welcome to the Ethiosat GEE Backend!');
 });
 
 // Start server

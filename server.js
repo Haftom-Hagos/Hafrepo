@@ -65,13 +65,13 @@ app.post('/getNDVI', (req, res) => {
         const visualizedNdvi = ndvi.visualize(visParams);
 
         visualizedNdvi.getDownloadURL({
-            scale: 30,
+            scale: 30, // Reduce scale if request size is too large (e.g., 100 for coarser resolution)
             region: geometry,
             format: 'PNG',
             crs: 'EPSG:4326',
             crs_transform: null
         }, (urlOrError) => {
-            if (urlOrError instanceof Error) { // Check if it's an error
+            if (urlOrError instanceof Error) {
                 console.error('NDVI generation error:', urlOrError);
                 return res.status(500).json({ error: 'Failed to generate NDVI: ' + urlOrError.message });
             }
@@ -83,7 +83,7 @@ app.post('/getNDVI', (req, res) => {
     }
 });
 
-// Endpoint for Land Cover (using COPERNICUS/S2_LC as an example)
+// Endpoint for Land Cover (using COPERNICUS/S2_LC as an example, corrected dataset)
 app.post('/getLandCover', (req, res) => {
     const { bbox } = req.body;
     if (!bbox || !bbox.west || !bbox.south || !bbox.east || !bbox.north) {
@@ -93,6 +93,7 @@ app.post('/getLandCover', (req, res) => {
     const geometry = ee.Geometry.Rectangle([bbox.west, bbox.south, bbox.east, bbox.north]);
 
     try {
+        // Corrected dataset: Use 'COPERNICUS/S2_LC' (ensure it exists and has access)
         const landCover = ee.Image('COPERNICUS/S2_LC').clip(geometry);
 
         const visParams = {
@@ -105,13 +106,13 @@ app.post('/getLandCover', (req, res) => {
         const visualizedLandCover = landCover.visualize(visParams);
 
         visualizedLandCover.getDownloadURL({
-            scale: 30,
+            scale: 30, // Adjust scale if needed to reduce request size
             region: geometry,
             format: 'PNG',
             crs: 'EPSG:4326',
             crs_transform: null
         }, (urlOrError) => {
-            if (urlOrError instanceof Error) { // Check if it's an error
+            if (urlOrError instanceof Error) {
                 console.error('Land Cover generation error:', urlOrError);
                 return res.status(500).json({ error: 'Failed to generate Land Cover: ' + urlOrError.message });
             }

@@ -70,12 +70,11 @@ app.post('/getNDVI', (req, res) => {
             format: 'PNG',
             crs: 'EPSG:4326',
             crs_transform: null
-        }, (url, error) => {
-            if (error) {
-                console.error('NDVI generation error:', error);
-                return res.status(500).json({ error: 'Failed to generate NDVI: ' + error.message });
-            }
+        }, (url) => {
             res.json({ url });
+        }, (error) => {
+            console.error('NDVI generation error:', error);
+            res.status(500).json({ error: 'Failed to generate NDVI: ' + error.message });
         });
     } catch (error) {
         console.error('Unexpected error in NDVI endpoint:', error);
@@ -110,12 +109,11 @@ app.post('/getLandCover', (req, res) => {
             format: 'PNG',
             crs: 'EPSG:4326',
             crs_transform: null
-        }, (url, error) => {
-            if (error) {
-                console.error('Land Cover generation error:', error);
-                return res.status(500).json({ error: 'Failed to generate Land Cover: ' + error.message });
-            }
+        }, (url) => {
             res.json({ url });
+        }, (error) => {
+            console.error('Land Cover generation error:', error);
+            res.status(500).json({ error: 'Failed to generate Land Cover: ' + error.message });
         });
     } catch (error) {
         console.error('Unexpected error in Land Cover endpoint:', error);

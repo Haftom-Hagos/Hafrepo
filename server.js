@@ -1,40 +1,97 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const ee = require("@google/earthengine");
-const privateKey = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+const cors = require("cors");
 
+// Initialize Express
 const app = express();
 app.use(bodyParser.json());
+app.use(cors());
 
-// Authenticate Earth Engine
+// Authenticate with Earth Engine
+const privateKey = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+
 ee.data.authenticateViaPrivateKey(privateKey, () => {
   ee.initialize(null, null, () => {
     console.log("Earth Engine initialized.");
   }, (err) => {
-    console.error("Initialization error: " + err);
+    console.error("EE initialization error:", err);
   });
 });
 
-// Example route: get NDVI mapId + token
-app.get("/ndvi", (req, res) => {
-  // Mekelle AOI (replace with your geometry later)
-  const mekelle = ee.Geometry.Point([39.47, 13.48]).buffer(50000);
+// Helper: mask clouds
+function maskS2clouds(image) {
+  const qa = image.select('QA60');
+  const cloudBitMask = 1 << 10;
+  const cirrusBitMask = 1 << 11;
+  const mask = qa.bitwiseAnd(cloudBitMask).eq(0)
+    .and(qa.bitwiseAnd(cirrusBitMask).eq(0));
+  return image.updateMask(mask).divide(10000);
+}
 
-  const dataset = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-    .filterDate("2020-01-01", "2020-12-31")
-    .filterBounds(mekelle)
-    .median();
+// Endpoint: /ndvi for visualization
+app.post("/ndvi", (req, res) => {
+  try {
+    const { bbox, startDate, endDate } = req.body;
+    if (!bbox || !startDate || !endDate) return res.status(400).json({ error: "Missing parameters" });
 
-  const ndvi = dataset.normalizedDifference(["B8", "B4"]).rename("NDVI");
+    const roi = ee.Geometry.Rectangle([bbox.west, bbox.south, bbox.east, bbox.north]);
 
-  const visParams = { min: 0, max: 1, palette: ["white","green"] };
+    const s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+      .filterBounds(roi)
+      .filterDate(startDate, endDate)
+      .map(maskS2clouds)
+      .median();
 
-  ndvi.getMap(visParams, (mapObj) => {
-    res.json(mapObj); // {mapid, token}
-  });
+    const ndvi = s2.normalizedDifference(["B8", "B4"]).rename("NDVI");
+
+    const visParams = { min: 0, max: 1, palette: ["white", "yellow", "green"] };
+
+    ndvi.getMap(visParams, (mapObj) => {
+      res.json(mapObj); // {mapid, token} for L.tileLayer
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Run server
+// Endpoint: /downloadNDVI for download
+app.post("/downloadNDVI", async (req, res) => {
+  try {
+    const { bbox, startDate, endDate } = req.body;
+    if (!bbox || !startDate || !endDate) return res.status(400).json({ error: "Missing parameters" });
+
+    const roi = ee.Geometry.Rectangle([bbox.west, bbox.south, bbox.east, bbox.north]);
+
+    const s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+      .filterBounds(roi)
+      .filterDate(startDate, endDate)
+      .map(maskS2clouds)
+      .median();
+
+    const ndvi = s2.normalizedDifference(["B8", "B4"]).rename("NDVI");
+
+    // Export to Drive URL
+    const task = ee.batch.Export.image.toDrive({
+      image: ndvi.clip(roi),
+      description: `NDVI_${Date.now()}`,
+      scale: 10,
+      region: roi,
+      fileFormat: "GeoTIFF",
+    });
+
+    task.start();
+
+    // Return a message (user needs to check their Drive)
+    res.json({ url: `Export started. Check your Google Drive for NDVI_${Date.now()}.tif` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

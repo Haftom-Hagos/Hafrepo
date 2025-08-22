@@ -6,7 +6,13 @@ const cors = require("cors");
 // Initialize Express
 const app = express();
 app.use(bodyParser.json());
-app.use(cors());
+
+// Allow your frontend domain to talk to your backend
+app.use(cors({
+  origin: ["https://ethiosathub.com"],  // allow only your frontend domain
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+}));
 
 // Authenticate with Earth Engine
 const privateKey = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
@@ -33,7 +39,9 @@ function maskS2clouds(image) {
 app.post("/ndvi", (req, res) => {
   try {
     const { bbox, startDate, endDate } = req.body;
-    if (!bbox || !startDate || !endDate) return res.status(400).json({ error: "Missing parameters" });
+    if (!bbox || !startDate || !endDate) {
+      return res.status(400).json({ error: "Missing parameters" });
+    }
 
     const roi = ee.Geometry.Rectangle([bbox.west, bbox.south, bbox.east, bbox.north]);
 
@@ -48,7 +56,7 @@ app.post("/ndvi", (req, res) => {
     const visParams = { min: 0, max: 1, palette: ["white", "yellow", "green"] };
 
     ndvi.getMap(visParams, (mapObj) => {
-      res.json(mapObj); // {mapid, token} for L.tileLayer
+      res.json(mapObj); // {mapid, token}
     });
   } catch (err) {
     console.error(err);
@@ -60,7 +68,9 @@ app.post("/ndvi", (req, res) => {
 app.post("/downloadNDVI", async (req, res) => {
   try {
     const { bbox, startDate, endDate } = req.body;
-    if (!bbox || !startDate || !endDate) return res.status(400).json({ error: "Missing parameters" });
+    if (!bbox || !startDate || !endDate) {
+      return res.status(400).json({ error: "Missing parameters" });
+    }
 
     const roi = ee.Geometry.Rectangle([bbox.west, bbox.south, bbox.east, bbox.north]);
 
@@ -83,7 +93,6 @@ app.post("/downloadNDVI", async (req, res) => {
 
     task.start();
 
-    // Return a message (user needs to check their Drive)
     res.json({ url: `Export started. Check your Google Drive for NDVI_${Date.now()}.tif` });
   } catch (err) {
     console.error(err);

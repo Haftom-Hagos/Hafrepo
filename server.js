@@ -97,6 +97,7 @@ app.post("/downloadNDVI", async (req, res) => {
     const task = ee.batch.Export.image.toDrive({
       image: ndvi.clip(roi),
       description: `NDVI_${Date.now()}`,
+      fileNamePrefix: `NDVI_${Date.now()}`,  // <-- Add this
       scale: 10,
       region: roi,
       fileFormat: "GeoTIFF",
@@ -116,4 +117,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 

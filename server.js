@@ -3,9 +3,20 @@ const bodyParser = require("body-parser");
 const ee = require("@google/earthengine");
 const cors = require("cors");
 
-// Initialize Express
 const app = express();
+
+// ✅ Allow requests from your frontend
+app.use(cors({
+  origin: "https://ethiosathub.com",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+}));
+
+// ✅ Handle preflight
+app.options("*", cors());
+
 app.use(bodyParser.json());
+
 
 // Allow your frontend domain to talk to your backend
 app.use(cors({
@@ -105,3 +116,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+

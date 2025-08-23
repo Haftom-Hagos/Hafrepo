@@ -5,22 +5,15 @@ const cors = require("cors");
 
 const app = express();
 app.use(cors());
-// ✅ Allow requests from your frontend
-//app.use(cors({
-  //origin: "https://ethiosathub.com",
-  //methods: ["GET", "POST"],
-  //allowedHeaders: ["Content-Type"]
-//}));
 
-// ✅ Handle preflight
+// Handle preflight
 app.options("*", cors());
 
 app.use(bodyParser.json());
 
-
-// Allow your frontend domain to talk to your backend
+// Allow only your frontend domain
 app.use(cors({
-  origin: ["https://ethiosathub.com"],  // allow only your frontend domain
+  origin: ["https://ethiosathub.com"],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"]
 }));
@@ -75,7 +68,7 @@ app.post("/ndvi", (req, res) => {
   }
 });
 
-// Endpoint: /downloadNDVI for download
+// Endpoint: /downloadNDVI for Google Drive export
 app.post("/downloadNDVI", async (req, res) => {
   try {
     const { bbox, startDate, endDate } = req.body;
@@ -93,11 +86,13 @@ app.post("/downloadNDVI", async (req, res) => {
 
     const ndvi = s2.normalizedDifference(["B8", "B4"]).rename("NDVI");
 
-    // Export to Drive URL
+    const exportName = `NDVI_${Date.now()}`;
+
+    // Export to Google Drive (Earth Engine > My Drive > Earth Engine folder)
     const task = ee.batch.Export.image.toDrive({
       image: ndvi.clip(roi),
-      description: `NDVI_${Date.now()}`,
-      fileNamePrefix: `NDVI_${Date.now()}`,  // <-- Add this
+      description: exportName,
+      fileNamePrefix: exportName,
       scale: 10,
       region: roi,
       fileFormat: "GeoTIFF",
@@ -105,7 +100,10 @@ app.post("/downloadNDVI", async (req, res) => {
 
     task.start();
 
-    res.json({ url: `Export started. Check your Google Drive for NDVI_${Date.now()}.tif` });
+    // ✅ Return clear message, not fake URL
+    res.json({
+      message: `Export started. Check your Google Drive (Earth Engine folder) for file: ${exportName}.tif`
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -117,6 +115,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-
-

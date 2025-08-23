@@ -4,13 +4,13 @@ const ee = require("@google/earthengine");
 const cors = require("cors");
 
 const app = express();
-
+app.use(cors());
 // ✅ Allow requests from your frontend
-app.use(cors({
-  origin: "https://ethiosathub.com",
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"]
-}));
+//app.use(cors({
+  //origin: "https://ethiosathub.com",
+  //methods: ["GET", "POST"],
+  //allowedHeaders: ["Content-Type"]
+//}));
 
 // ✅ Handle preflight
 app.options("*", cors());
@@ -117,5 +117,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
 

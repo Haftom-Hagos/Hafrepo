@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pystac-client
+planetary-computer
+rasterio
+numpy
+shapely
+pyproj
+matplotlib
